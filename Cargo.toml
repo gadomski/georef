@@ -1,4 +1,15 @@
 [package]
-name = "georeference"
+name = "georef"
 version = "0.1.0"
 authors = ["Pete Gadomski <pete.gadomski@gmail.com>"]
+
+[features]
+rxp = ["pabst/rxp", "rivlib"]
+
+[dependencies]
+las = { git = "https://github.com/gadomski/las-rs.git" }
+pabst = { git = "https://github.com/gadomski/pabst.git" }
+rivlib = { git = "https://github.com/gadomski/rivlib-rs.git", optional = true }
+
+[profile.test]
+opt-level = 2
