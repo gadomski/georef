@@ -52,5 +52,5 @@ fn main() {
     let mut sink = pabst::open_file_sink(args.arg_outfile, sink_options).unwrap();
     let georeferencer = Georeferencer::new(UtmZone(args.arg_utm_zone));
     georeferencer.georeference(&mut *source, pos, &mut *sink).unwrap();
-    sink.close_file_sink().unwrap();
+    sink.close_sink().unwrap();
 }

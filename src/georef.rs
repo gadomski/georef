@@ -1,7 +1,5 @@
 //! Georeference LiDAR points.
 
-use std::path::Path;
-
 use pabst;
 
 use Result;
@@ -40,11 +38,11 @@ impl Georeferencer {
     }
 
     /// Georeference a point cloud.
-    pub fn georeference<P: AsRef<Path>>(&self,
-                                        source: &mut pabst::FileSource,
-                                        imu_gnss: &ImuGnss,
-                                        sink: &mut pabst::FileSink<P>)
-                                        -> Result<()> {
+    pub fn georeference(&self,
+                        source: &mut pabst::Source,
+                        imu_gnss: &ImuGnss,
+                        sink: &mut pabst::Sink)
+                        -> Result<()> {
         let mut hint = 0;
         loop {
             let points = match try!(source.source(self.chunk_size)) {
@@ -92,7 +90,7 @@ mod tests {
         let georeferencer = Georeferencer::new(UtmZone(6));
         georeferencer.georeference(&mut *source, pos, &mut *sink).unwrap();
 
-        sink.close_file_sink().unwrap();
+        sink.close_sink().unwrap();
 
         let file = las::File::from_path("temp.las").unwrap();
         assert_eq!(257576, file.points().len());
