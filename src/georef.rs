@@ -45,7 +45,7 @@ impl Georeferencer {
                 Some(points) => points,
                 None => break,
             };
-            for mut point in points {
+            for point in points {
                 let time = try!(point.gps_time().ok_or(Error::MissingGpsTime)) + self.time_offset;
                 let (pos, new_hint) = try!(imu_gnss.interpolate_trajectory(time, hint));
                 hint = new_hint;
@@ -55,9 +55,10 @@ impl Georeferencer {
                                        self.lever_arm;
                 let Vector3(x, y, z) = pos_utm.rotation_matrix() * Vector3(x, y, z) +
                                        pos_utm.location();
-                point.set_x(x);
-                point.set_y(y);
-                point.set_z(z);
+                let mut point = point.into_generic();
+                point.x = x;
+                point.y = y;
+                point.z = z;
                 try!(sink.sink(&point));
             }
         }
