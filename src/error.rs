@@ -32,10 +32,10 @@ impl From<ParseIntError> for Error {
     fn from(err: ParseIntError) -> Error {
         Error::ParseInt(err)
     }
-    }
+}
 
 impl From<ParseFloatError> for Error {
     fn from(err: ParseFloatError) -> Error {
         Error::ParseFloat(err)
     }
-    }
+}

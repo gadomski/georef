@@ -1,5 +1,7 @@
 //! Georeference LiDAR points.
 
+use std::path::Path;
+
 use pabst;
 
 use Result;
@@ -38,28 +40,31 @@ impl Georeferencer {
     }
 
     /// Georeference a point cloud.
-    pub fn georeference<P: pabst::Point, S: pabst::Source<Point=P>, T: pabst::Sink>(&self, mut source: S, imu_gnss: &ImuGnss, sink: &mut T) -> Result<()> {
+    pub fn georeference<P: AsRef<Path>>(&self,
+                                        source: &mut pabst::FileSource,
+                                        imu_gnss: &ImuGnss,
+                                        sink: &mut pabst::FileSink<P>)
+                                        -> Result<()> {
         let mut hint = 0;
         loop {
             let points = match try!(source.source(self.chunk_size)) {
                 Some(points) => points,
                 None => break,
             };
-            for point in points {
-                let time = try!(point.gps_time().ok_or(Error::MissingGpsTime)) + self.time_offset;
+            for mut point in points {
+                let time = try!(point.gps_time.ok_or(Error::MissingGpsTime)) + self.time_offset;
                 let (pos, new_hint) = try!(imu_gnss.interpolate_trajectory(time, hint));
                 hint = new_hint;
                 let pos_utm = pos.into_utm(self.utm_zone);
                 let Vector3(x, y, z) = self.boresight_matrix *
-                                       Vector3(-1.0 * point.z(), point.x(), point.y()) +
+                                       Vector3(-1.0 * point.z, point.x, point.y) +
                                        self.lever_arm;
                 let Vector3(x, y, z) = pos_utm.rotation_matrix() * Vector3(x, y, z) +
                                        pos_utm.location();
-                let mut point = point.into_generic();
                 point.x = x;
                 point.y = y;
                 point.z = z;
-                try!(sink.sink(&point));
+                try!(sink.sink(point));
             }
         }
         Ok(())
@@ -71,25 +76,26 @@ impl Georeferencer {
 mod tests {
     use super::*;
 
-    use std::io::Cursor;
+    use std::collections::HashMap;
+    use std::fs::remove_file;
 
     use las;
-    use rivlib;
+    use pabst::{open_file_source, open_file_sink};
 
     use imu_gnss::{ImuGnss, UtmZone};
 
     #[test]
     fn rxp_georeference() {
-        let source = rivlib::Stream::open("data/0916_2014_girdwood35.rxp", true).unwrap();
+        let mut source = open_file_source("data/0916_2014_girdwood35.rxp", HashMap::new()).unwrap();
         let ref pos = ImuGnss::from_path("data/0916_2014_ie.pos").unwrap();
-        let ref mut sink = las::File::new();
+        let mut sink = open_file_sink("temp.las", HashMap::new()).unwrap();
         let georeferencer = Georeferencer::new(UtmZone(6));
-        georeferencer.georeference(source, pos, sink).unwrap();
+        georeferencer.georeference(&mut *source, pos, &mut *sink).unwrap();
 
-        let ref mut cursor = Cursor::new(Vec::new());
-        sink.write_to(cursor).unwrap();
-        cursor.set_position(0);
-        let file = las::File::read_from(cursor).unwrap();
+        sink.close_file_sink().unwrap();
+
+        let file = las::File::from_path("temp.las").unwrap();
         assert_eq!(257576, file.points().len());
+        remove_file("temp.las").unwrap();
     }
 }

@@ -1,32 +1,25 @@
 //! Executable inferface for georeferncing point clouds.
-//!
-//! For now, this just converts rxp to las. However, when we make pabst smarter this will do more.
 
 extern crate docopt;
 extern crate georef;
 extern crate las;
 extern crate pabst;
-#[cfg(feature = "rxp")]
-extern crate rivlib;
 extern crate rustc_serialize;
 
+use std::collections::HashMap;
+
 use docopt::Docopt;
-#[cfg(feature = "rxp")]
-use georef::imu_gnss::ImuGnss;
-#[cfg(feature = "rxp")]
-use georef::imu_gnss::UtmZone;
-#[cfg(feature = "rxp")]
-use georef::georef::Georeferencer;
+use georef::{Georeferencer, ImuGnss, UtmZone};
 
 const USAGE: &'static str = "
 Georeference point clouds.
 
 Usage:
     georef <infile> \
-                             <gnss-imu-file> <outfile>
+                             <gnss-imu-file> <utm-zone> <outfile>
     georef (-h | --help)
-    georef \
-                             --version
+    \
+                             georef --version
 
 Options:
     -h --help       Display this message.
@@ -39,22 +32,7 @@ struct Args {
     arg_infile: String,
     arg_gnss_imu_file: String,
     arg_outfile: String,
-}
-
-#[cfg(feature = "rxp")]
-fn handle_args(args: Args) {
-    let source = rivlib::Stream::open(args.arg_infile, true).unwrap();
-    let ref pos = ImuGnss::from_path(args.arg_gnss_imu_file).unwrap();
-    let ref mut sink = las::File::new().scale_factors(0.01, 0.01, 0.01).auto_offsets(true);
-    let georeferencer = Georeferencer::new(UtmZone(6));
-    georeferencer.georeference(source, pos, sink).unwrap();
-    sink.to_path(args.arg_outfile).unwrap();
-}
-
-#[cfg(not(feature = "rxp"))]
-#[allow(unused_variables)]
-fn handle_args(args: Args) {
-    println!("That's all, folks!");
+    arg_utm_zone: u8,
 }
 
 fn main() {
@@ -64,5 +42,15 @@ fn main() {
                          })
                          .unwrap_or_else(|e| e.exit());
 
-    handle_args(args);
+    let mut source_options = HashMap::new();
+    source_options.insert("sync-to-pps".to_string(), "true".to_string());
+    let mut source = pabst::open_file_source(args.arg_infile, source_options).unwrap();
+    let ref pos = ImuGnss::from_path(args.arg_gnss_imu_file).unwrap();
+    let mut sink_options = HashMap::new();
+    sink_options.insert("scale-factors".to_string(), "0.01 0.01 0.01".to_string());
+    sink_options.insert("auto-offsets".to_string(), "true".to_string());
+    let mut sink = pabst::open_file_sink(args.arg_outfile, sink_options).unwrap();
+    let georeferencer = Georeferencer::new(UtmZone(args.arg_utm_zone));
+    georeferencer.georeference(&mut *source, pos, &mut *sink).unwrap();
+    sink.close_file_sink().unwrap();
 }
