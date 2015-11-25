@@ -1,0 +1,6 @@
+[source]
+sync-to-gps: true
+
+[sink]
+auto-offset: true
+scale-factors: 0.01 0.01 0.01

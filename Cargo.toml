@@ -4,14 +4,15 @@ version = "0.1.0"
 authors = ["Pete Gadomski <pete.gadomski@gmail.com>"]
 
 [features]
-rxp = ["pabst/rxp", "rivlib"]
+rxp = ["pabst/rxp-source", "rivlib"]
 
 [dependencies]
 docopt = "0.6"
 las = { git = "https://github.com/gadomski/las-rs.git" }
 pabst = { git = "https://github.com/gadomski/pabst.git" }
-rivlib = { git = "https://github.com/gadomski/rivlib-rs.git", optional = true }
+rivlib = { version = "0.1", optional = true }
 rustc-serialize = "0.3"
+toml = "0.1"
 
 [profile.test]
 opt-level = 2

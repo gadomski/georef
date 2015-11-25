@@ -5,8 +5,11 @@ extern crate georef;
 extern crate las;
 extern crate pabst;
 extern crate rustc_serialize;
+extern crate toml;
 
-use std::collections::HashMap;
+use std::fs::File;
+use std::io::Read;
+use std::process::exit;
 
 use docopt::Docopt;
 use georef::{Georeferencer, ImuGnss, UtmZone};
@@ -16,23 +19,25 @@ Georeference point clouds.
 
 Usage:
     georef <infile> \
-                             <gnss-imu-file> <utm-zone> <outfile>
-    georef (-h | --help)
+                             <gnss-imu-file> <outfile> [--config-file=<config-file>] [--utm-zone=<z>]
     \
-                             georef --version
+                             georef (-h | --help)
+    georef --version
 
 Options:
-    -h --help       Display this message.
-    \
-                             --version       Display version.
+    -h --help                       Display this message.
+    --version                       Display  version.
+    --config-file=<config-file>     Configuration file.
+    --utm-zone=<n>                  UTM zone for final data, overrides value in configuration file.
 ";
 
 #[derive(Debug, RustcDecodable)]
 struct Args {
+    flag_config_file: Option<String>,
+    flag_utm_zone: Option<u8>,
     arg_infile: String,
     arg_gnss_imu_file: String,
     arg_outfile: String,
-    arg_utm_zone: u8,
 }
 
 fn main() {
@@ -42,15 +47,36 @@ fn main() {
                          })
                          .unwrap_or_else(|e| e.exit());
 
-    let mut source_options = HashMap::new();
-    source_options.insert("sync-to-pps".to_string(), "true".to_string());
-    let mut source = pabst::open_file_source(args.arg_infile, source_options).unwrap();
+    let config = if let Some(config_file) = args.flag_config_file {
+        let mut config = String::new();
+        File::open(config_file).unwrap().read_to_string(&mut config).unwrap();
+        toml::Parser::new(&config).parse().unwrap()
+    } else {
+        toml::Table::new()
+    };
+
+    let mut source = pabst::open_file_source(args.arg_infile,
+                                             config.get("source").and_then(|b| b.as_table()))
+                         .unwrap();
+
     let ref pos = ImuGnss::from_path(args.arg_gnss_imu_file).unwrap();
-    let mut sink_options = HashMap::new();
-    sink_options.insert("scale-factors".to_string(), "0.01 0.01 0.01".to_string());
-    sink_options.insert("auto-offsets".to_string(), "true".to_string());
-    let mut sink = pabst::open_file_sink(args.arg_outfile, sink_options).unwrap();
-    let georeferencer = Georeferencer::new(UtmZone(args.arg_utm_zone));
+
+    let mut sink = pabst::open_file_sink(args.arg_outfile,
+                                         config.get("sink").and_then(|b| b.as_table()))
+                       .unwrap();
+
+    let georef_config = config.get("georef").and_then(|b| b.as_table());
+    let utm_zone = if let Some(zone) = args.flag_utm_zone {
+        UtmZone(zone)
+    } else if let Some(table) = georef_config {
+        UtmZone(table.get("utm-zone").unwrap().as_integer().unwrap() as u8)
+    } else {
+        println!("No UTM zone provided");
+        exit(1);
+    };
+    let georeferencer = Georeferencer::new(utm_zone);
+
     georeferencer.georeference(&mut *source, pos, &mut *sink).unwrap();
+
     sink.close_sink().unwrap();
 }
