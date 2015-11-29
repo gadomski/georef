@@ -74,7 +74,6 @@ impl Georeferencer {
 mod tests {
     use super::*;
 
-    use std::collections::HashMap;
     use std::fs::remove_file;
 
     use las;
@@ -84,16 +83,16 @@ mod tests {
 
     #[test]
     fn rxp_georeference() {
-        let mut source = open_file_source("data/0916_2014_girdwood35.rxp", HashMap::new()).unwrap();
+        let mut source = open_file_source("data/0916_2014_girdwood35.rxp", None).unwrap();
         let ref pos = ImuGnss::from_path("data/0916_2014_ie.pos").unwrap();
-        let mut sink = open_file_sink("temp.las", HashMap::new()).unwrap();
+        let mut sink = open_file_sink("temp.las", None).unwrap();
         let georeferencer = Georeferencer::new(UtmZone(6));
         georeferencer.georeference(&mut *source, pos, &mut *sink).unwrap();
 
         sink.close_sink().unwrap();
 
-        let file = las::File::from_path("temp.las").unwrap();
-        assert_eq!(257576, file.points().len());
+        let mut reader = las::Reader::from_path("temp.las").unwrap();
+        assert_eq!(257576, reader.read_all().unwrap().len());
         remove_file("temp.las").unwrap();
     }
 }
