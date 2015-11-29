@@ -2,6 +2,7 @@
 
 extern crate las;
 extern crate pabst;
+extern crate pof;
 
 pub mod error;
 pub mod georef;

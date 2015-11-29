@@ -4,6 +4,7 @@ use std::io;
 use std::num::{ParseIntError, ParseFloatError};
 
 use pabst;
+use pof;
 
 #[derive(Debug)]
 pub enum Error {
@@ -14,6 +15,8 @@ pub enum Error {
     Pabst(pabst::Error),
     ParseInt(ParseIntError),
     ParseFloat(ParseFloatError),
+    Pof(pof::Error),
+    UnknownFileExtension(String),
 }
 
 impl From<io::Error> for Error {
@@ -37,5 +40,11 @@ impl From<ParseIntError> for Error {
 impl From<ParseFloatError> for Error {
     fn from(err: ParseFloatError) -> Error {
         Error::ParseFloat(err)
+    }
+}
+
+impl From<pof::Error> for Error {
+    fn from(err: pof::Error) -> Error {
+        Error::Pof(err)
     }
 }

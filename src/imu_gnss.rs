@@ -1,6 +1,7 @@
 //! Position and attitude information.
 
 use std::f64::consts::PI;
+use std::ffi::OsStr;
 use std::fs::File;
 use std::io::{BufReader, BufRead};
 use std::path::Path;
@@ -8,6 +9,7 @@ use std::path::Path;
 use Result;
 use error::Error;
 use linalg::{Matrix3, Vector3};
+use pof::pof;
 
 pub struct ImuGnss {
     points: Vec<ImuGnssPoint>,
@@ -22,12 +24,31 @@ impl ImuGnss {
     /// use georef::imu_gnss::ImuGnss;
     /// let imu_gnss = ImuGnss::from_path("data/0916_2014_ie.pos").unwrap();
     /// ```
-    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<ImuGnss> {
-        let reader = BufReader::new(try!(File::open(path)));
-        ImuGnss::read_from(reader)
+    pub fn from_path<P: AsRef<Path> + AsRef<OsStr>>(path: P) -> Result<ImuGnss> {
+        let path = Path::new(&path);
+        let ext = path.extension().and_then(|p| p.to_str());
+        match ext {
+            Some("pos") => {
+                let reader = BufReader::new(try!(File::open(path)));
+                ImuGnss::read_pos_from(reader)
+            }
+            Some("pof") => {
+                let records = try!(pof::Reader::from_path(path)).into_iter().map(|p| ImuGnssPoint {
+                    time: p.time,
+                    latitude: Radians::from_degrees(p.latitude),
+                    longitude: Radians::from_degrees(p.longitude),
+                    height: p.altitude as f32,
+                    roll: Radians::from_degrees(p.roll),
+                    pitch: Radians::from_degrees(p.pitch),
+                    heading: Radians::from_degrees(p.yaw),
+                }).collect();
+                Ok(ImuGnss { points: records })
+            }
+            Some(_) | None => Err(Error::UnknownFileExtension(path.to_str().unwrap().to_string())),
+        }
     }
 
-    /// Reads IMU/GNSS information from a `BufRead`.
+    /// Reads pos IMU/GNSS information from a `BufRead`.
     ///
     /// # Examples
     ///
@@ -36,9 +57,9 @@ impl ImuGnss {
     /// use std::io::BufReader;
     /// use georef::imu_gnss::ImuGnss;
     /// let reader = BufReader::new(File::open("data/0916_2014_ie.pos").unwrap());
-    /// let imu_gnss = ImuGnss::read_from(reader).unwrap();
+    /// let imu_gnss = ImuGnss::read_pos_from(reader).unwrap();
     /// ```
-    pub fn read_from<B: BufRead>(mut reader: B) -> Result<ImuGnss> {
+    pub fn read_pos_from<B: BufRead>(mut reader: B) -> Result<ImuGnss> {
         let ref mut header: String = String::new();
         try!(reader.read_line(header));
         let npoints = try!(header.trim().parse::<usize>());
