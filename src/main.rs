@@ -65,12 +65,15 @@ fn main() {
         toml::Table::new()
     };
 
+    println!("Opening the point source");
     let mut source = pabst::open_file_source(args.arg_infile,
                                              config.get("source").and_then(|b| b.as_table()))
                          .unwrap();
 
+    println!("Reading IMU/GNSS data");
     let ref pos = imu_gnss_from_path(args.arg_gnss_imu_file).unwrap();
 
+    println!("Opening the point sink");
     let mut sink = pabst::open_file_sink(args.arg_outfile,
                                          config.get("sink").and_then(|b| b.as_table()))
                        .unwrap();
@@ -86,7 +89,9 @@ fn main() {
     };
     let georeferencer = Georeferencer::new(utm_zone);
 
+    println!("Georeferencing");
     georeferencer.georeference(&mut *source, pos, &mut *sink).unwrap();
+    println!("Done");
 
     sink.close_sink().unwrap();
 }

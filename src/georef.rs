@@ -78,23 +78,23 @@ mod tests {
 
     use std::fs::remove_file;
 
-    use las;
     use pabst::{open_file_source, open_file_sink};
 
     use imu_gnss::{ImuGnss, UtmZone};
+    use pos::read_pos_file;
 
     #[test]
     fn rxp_georeference() {
         let mut source = open_file_source("data/0916_2014_girdwood35.rxp", None).unwrap();
-        let ref pos = ImuGnss::from_path("data/0916_2014_ie.pos").unwrap();
+        let ref pos = ImuGnss::new(read_pos_file("data/0916_2014_ie.pos").unwrap());
         let mut sink = open_file_sink("temp.las", None).unwrap();
         let georeferencer = Georeferencer::new(UtmZone(6));
         georeferencer.georeference(&mut *source, pos, &mut *sink).unwrap();
 
         sink.close_sink().unwrap();
 
-        let mut reader = las::Reader::from_path("temp.las").unwrap();
-        assert_eq!(257576, reader.read_all().unwrap().len());
+        let mut source = open_file_source("temp.las", None).unwrap();
+        assert_eq!(257576, source.source_to_end(300000).unwrap().len());
         remove_file("temp.las").unwrap();
     }
 }
