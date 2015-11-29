@@ -2,8 +2,6 @@
 
 extern crate las;
 extern crate pabst;
-#[cfg(feature = "rxp")]
-extern crate rivlib;
 
 pub mod error;
 pub mod georef;
