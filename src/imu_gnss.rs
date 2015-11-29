@@ -1,88 +1,27 @@
 //! Position and attitude information.
 
 use std::f64::consts::PI;
-use std::ffi::OsStr;
-use std::fs::File;
-use std::io::{BufReader, BufRead};
-use std::path::Path;
 
 use Result;
 use error::Error;
 use linalg::{Matrix3, Vector3};
-use pof::pof;
 
-pub struct ImuGnss {
+/// A collection of ImuGnss records.
+#[derive(Debug)] pub struct ImuGnss {
     points: Vec<ImuGnssPoint>,
 }
 
 impl ImuGnss {
-    /// Reads IMU/GNSS information from a file.
+    /// Creates a new set of IMU/GNSS records.
     ///
     /// # Examples
     ///
-    /// ```no_run
-    /// use georef::imu_gnss::ImuGnss;
-    /// let imu_gnss = ImuGnss::from_path("data/0916_2014_ie.pos").unwrap();
     /// ```
-    pub fn from_path<P: AsRef<Path> + AsRef<OsStr>>(path: P) -> Result<ImuGnss> {
-        let path = Path::new(&path);
-        let ext = path.extension().and_then(|p| p.to_str());
-        match ext {
-            Some("pos") => {
-                let reader = BufReader::new(try!(File::open(path)));
-                ImuGnss::read_pos_from(reader)
-            }
-            Some("pof") => {
-                let records = try!(pof::Reader::from_path(path)).into_iter().map(|p| ImuGnssPoint {
-                    time: p.time,
-                    latitude: Radians::from_degrees(p.latitude),
-                    longitude: Radians::from_degrees(p.longitude),
-                    height: p.altitude as f32,
-                    roll: Radians::from_degrees(p.roll),
-                    pitch: Radians::from_degrees(p.pitch),
-                    heading: Radians::from_degrees(p.yaw),
-                }).collect();
-                Ok(ImuGnss { points: records })
-            }
-            Some(_) | None => Err(Error::UnknownFileExtension(path.to_str().unwrap().to_string())),
-        }
-    }
-
-    /// Reads pos IMU/GNSS information from a `BufRead`.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use std::fs::File;
-    /// use std::io::BufReader;
     /// use georef::imu_gnss::ImuGnss;
-    /// let reader = BufReader::new(File::open("data/0916_2014_ie.pos").unwrap());
-    /// let imu_gnss = ImuGnss::read_pos_from(reader).unwrap();
+    /// let imu_gnss = ImuGnss::new(Vec::new());
     /// ```
-    pub fn read_pos_from<B: BufRead>(mut reader: B) -> Result<ImuGnss> {
-        let ref mut header: String = String::new();
-        try!(reader.read_line(header));
-        let npoints = try!(header.trim().parse::<usize>());
-        let mut points = Vec::with_capacity(npoints);
-        for line in reader.lines() {
-            let line = try!(line);
-            let values: Vec<_> = line.split_whitespace().collect();
-            if values.len() == 0 {
-                // Empty line, go ahead and carry on
-                continue;
-            }
-            let point = ImuGnssPoint {
-                time: try!(values[0].parse()),
-                latitude: Radians::from_degrees(try!(values[1].parse())),
-                longitude: Radians::from_degrees(try!(values[2].parse())),
-                height: try!(values[3].parse()),
-                roll: Radians::from_degrees(try!(values[4].parse())),
-                pitch: Radians::from_degrees(try!(values[5].parse())),
-                heading: Radians::from_degrees(try!(values[6].parse())),
-            };
-            points.push(point);
-        }
-        Ok(ImuGnss { points: points })
+    pub fn new(points: Vec<ImuGnssPoint>) -> ImuGnss {
+        ImuGnss { points: points }
     }
 
     /// Returns this position file's points.
@@ -91,7 +30,8 @@ impl ImuGnss {
     ///
     /// ```no_run
     /// use georef::imu_gnss::ImuGnss;
-    /// let imu_gnss = ImuGnss::from_path("data/0916_2014_ie.pos").unwrap();
+    /// use georef::pos::read_pos_file;
+    /// let imu_gnss = ImuGnss::new(read_pos_file("data/0916_2014_ie.pos").unwrap());
     /// let points = imu_gnss.points();
     /// ```
     pub fn points(&self) -> &Vec<ImuGnssPoint> {
@@ -108,7 +48,8 @@ impl ImuGnss {
     ///
     /// ```no_run
     /// use georef::imu_gnss::ImuGnss;
-    /// let imu_gnss = ImuGnss::from_path("data/0916_2014_ie.pos").unwrap();
+    /// use georef::pos::read_pos_file;
+    /// let imu_gnss = ImuGnss::new(read_pos_file("data/0916_2014_ie.pos").unwrap());
     /// let (point, hint) = imu_gnss.interpolate_trajectory(61191.0, 0).unwrap();
     /// ```
     pub fn interpolate_trajectory(&self,
@@ -152,7 +93,9 @@ impl ImuGnss {
     }
 }
 
-#[derive(Debug, Default)]
+/// A location and orientation point.
+#[derive(Clone, Copy, Debug, Default)]
+#[allow(missing_docs)]
 pub struct ImuGnssPoint {
     pub time: f64,
     pub latitude: Radians,
@@ -276,6 +219,9 @@ fn footprint_latitude(e1: f64, mu: f64) -> f64 {
     term4 * (8.0 * mu).sin()
 }
 
+/// A IMU/GNSS point in UTM.
+#[derive(Clone, Copy, Debug)]
+#[allow(missing_docs)]
 pub struct ImuGnssUtmPoint {
     pub time: f64,
     pub northing: f64,
@@ -320,25 +266,17 @@ impl ImuGnssUtmPoint {
     }
 }
 
-#[derive(Debug, Default)]
+/// Newtype wrapper around a raidan value.
+#[derive(Clone, Copy, Debug, Default)]
 pub struct Radians(pub f64);
 
 impl Radians {
+    /// Convert a degree value to a radian value.
     pub fn from_degrees(degrees: f64) -> Radians {
         Radians(degrees * PI / 180.0)
     }
 }
 
+/// A newtype wrapper around a UTM zone.
 #[derive(Clone, Copy, Debug)]
 pub struct UtmZone(pub u8);
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn point_count() {
-        let imu_gnss = ImuGnss::from_path("data/0916_2014_ie.pos").unwrap();
-        assert_eq!(722800, imu_gnss.points().len());
-    }
-}

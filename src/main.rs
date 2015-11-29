@@ -4,31 +4,41 @@ extern crate docopt;
 extern crate georef;
 extern crate las;
 extern crate pabst;
+extern crate pof;
 extern crate rustc_serialize;
 extern crate toml;
 
+use std::ffi::OsStr;
 use std::fs::File;
 use std::io::Read;
+use std::path::Path;
 use std::process::exit;
 
 use docopt::Docopt;
-use georef::{Georeferencer, ImuGnss, UtmZone};
+use georef::{Error, Result, Georeferencer, ImuGnss, ImuGnssPoint, Radians, UtmZone};
+use georef::pos::read_pos_file;
+use pof::pof::Reader as PofReader;
 
 const USAGE: &'static str = "
 Georeference point clouds.
 
 Usage:
     georef <infile> \
-                             <gnss-imu-file> <outfile> [--config-file=<config-file>] [--utm-zone=<z>]
-    \
-                             georef (-h | --help)
+                             <gnss-imu-file> <outfile> [--config-file=<config-file>] \
+                             [--utm-zone=<z>]
+    georef (-h | --help)
     georef --version
 
-Options:
+\
+                             Options:
     -h --help                       Display this message.
-    --version                       Display  version.
-    --config-file=<config-file>     Configuration file.
-    --utm-zone=<n>                  UTM zone for final data, overrides value in configuration file.
+    \
+                             --version                       Display  version.
+    \
+                             --config-file=<config-file>     Configuration file.
+    \
+                             --utm-zone=<n>                  UTM zone for final data, overrides \
+                             value in configuration file.
 ";
 
 #[derive(Debug, RustcDecodable)]
@@ -59,7 +69,7 @@ fn main() {
                                              config.get("source").and_then(|b| b.as_table()))
                          .unwrap();
 
-    let ref pos = ImuGnss::from_path(args.arg_gnss_imu_file).unwrap();
+    let ref pos = imu_gnss_from_path(args.arg_gnss_imu_file).unwrap();
 
     let mut sink = pabst::open_file_sink(args.arg_outfile,
                                          config.get("sink").and_then(|b| b.as_table()))
@@ -79,4 +89,30 @@ fn main() {
     georeferencer.georeference(&mut *source, pos, &mut *sink).unwrap();
 
     sink.close_sink().unwrap();
+}
+
+fn imu_gnss_from_path<P: AsRef<Path> + AsRef<OsStr>>(path: P) -> Result<ImuGnss> {
+    let path = Path::new(&path);
+    let ext = path.extension().and_then(|p| p.to_str());
+    match ext {
+        Some("pos") => Ok(ImuGnss::new(try!(read_pos_file(path)))),
+        Some("pof") => {
+            let records = try!(PofReader::from_path(path))
+                              .into_iter()
+                              .map(|p| {
+                                  ImuGnssPoint {
+                                      time: p.time,
+                                      latitude: Radians::from_degrees(p.latitude),
+                                      longitude: Radians::from_degrees(p.longitude),
+                                      height: p.altitude as f32,
+                                      roll: Radians::from_degrees(p.roll),
+                                      pitch: Radians::from_degrees(p.pitch),
+                                      heading: Radians::from_degrees(p.yaw),
+                                  }
+                              })
+                              .collect();
+            Ok(ImuGnss::new(records))
+        }
+        Some(_) | None => panic!("unknown file extension"),
+    }
 }

@@ -9,6 +9,8 @@ use linalg::{Matrix3, Vector3};
 
 const DEFAULT_CHUNK_SIZE: usize = 1000;
 
+/// A configurable structure for georeferencing points.
+#[derive(Clone, Copy, Debug)]
 pub struct Georeferencer {
     boresight_matrix: Matrix3,
     chunk_size: usize,
