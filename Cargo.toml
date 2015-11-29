@@ -7,6 +7,10 @@ authors = ["Pete Gadomski <pete.gadomski@gmail.com>"]
 rxp = ["pabst/rxp-source"]
 sdf = ["pabst/sdf-source"]
 
+[[bin]]
+name = "georef"
+doc = false
+
 [dependencies]
 docopt = "0.6"
 las = { git = "https://github.com/gadomski/las-rs.git" }
