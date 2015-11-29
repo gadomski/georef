@@ -62,7 +62,7 @@ impl Georeferencer {
                 point.x = x;
                 point.y = y;
                 point.z = z;
-                try!(sink.sink(point));
+                try!(sink.sink(&point));
             }
         }
         Ok(())
