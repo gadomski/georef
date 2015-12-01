@@ -2,6 +2,8 @@
 
 use std::f64::consts::PI;
 
+use utm::radians_to_utm_wgs84;
+
 use Result;
 use error::Error;
 use linalg::{Matrix3, Vector3};
@@ -136,40 +138,7 @@ impl ImuGnssPoint {
     /// ```
     #[allow(non_snake_case)]
     pub fn into_utm(self, zone: UtmZone) -> ImuGnssUtmPoint {
-        let latitude = self.latitude.0;
-        let longitude = self.longitude.0;
-        let long_origin = zone.0 as f64 * 6.0 - 183.0;
-        let a = 6378137.0;
-        let f = 1.0 / 298.257222101;
-        let e2 = 2.0 * f - f * f;
-        let ep2 = e2 / (1.0 - e2);
-
-        let N = a / (1.0 - e2 * latitude.sin() * latitude.sin()).sqrt();
-        let T = latitude.tan() * latitude.tan();
-        let C = ep2 * latitude.cos() * latitude.cos();
-        let A = latitude.cos() * (longitude - (long_origin * PI / 180.0));
-
-        let term1 = 1.0 - e2 / 4.0 - (3.0 * e2 * e2) / 64.0 - (5.0 * e2 * e2 * e2) / 256.0;
-        let term2 = (3.0 * e2) / 8.0 + (3.0 * e2 * e2) / 32.0 + (45.0 * e2 * e2 * e2) / 1024.0;
-        let term3 = (15.0 * e2 * e2) / 256.0 + (45.0 * e2 * e2 * e2) / 1024.0;
-        let term4 = (35.0 * e2 * e2 * e2) / 3072.0;
-
-        let M = a *
-                (term1 * latitude - term2 * (2.0 * latitude).sin() +
-                 term3 * (4.0 * latitude).sin() - term4 * (6.0 * latitude).sin());
-
-        let x1 = ((1.0 - T + C) * A * A * A) / 6.0;
-        let x2 = ((5.0 - 18.0 * T + T * T + 72.0 * C - 58.0 * ep2) * A * A * A * A * A) / 120.0;
-        let x = 0.9996 * N * (A + x1 + x2);
-
-        let y1 = (5.0 - T + 9.0 * C + 4.0 * C * C) * (A * A * A * A) / 24.0;
-        let y2 = (61.0 - 58.0 * T + T * T + 600.0 * C - 330.0 * ep2) * (A * A * A * A * A * A) /
-                 720.0;
-        let y3 = (A * A) / 2.0 + y1 + y2;
-        let y = 0.9996 * (M + N * latitude.tan() * y3);
-
-        let northing = y;
-        let easting = x + 500000.0;
+        let (northing, easting, meridian_convergence) = radians_to_utm_wgs84(self.latitude.0, self.longitude.0, zone.0);
         ImuGnssUtmPoint {
             time: self.time,
             northing: northing,
@@ -177,46 +146,9 @@ impl ImuGnssPoint {
             height: self.height,
             roll: self.roll,
             pitch: self.pitch,
-            heading: Radians(self.heading.0 + meridian_convergence(easting, northing)),
+            heading: Radians(self.heading.0 + meridian_convergence),
         }
     }
-}
-
-#[allow(non_snake_case)]
-fn meridian_convergence(easting: f64, northing: f64) -> f64 {
-    let WGS84_a = 6378137.0; /* Meters */
-    let WGS84_f = 1.0 / 298.257222101;
-
-    let e2: f64 = 2.0 * WGS84_f - WGS84_f * WGS84_f;
-    let e1 = (1.0 - (1.0 - e2).sqrt()) / (1.0 + (1.0 - e2).sqrt());
-    let mu_const = WGS84_a * (1.0 - e2 / 4.0 - 3.0 * e2 * e2 / 64.0 - 5.0 * e2 * e2 * e2 / 256.0);
-
-    let Np = northing / 0.9996;
-    let mu = Np / mu_const;
-    let foot_lat = footprint_latitude(e1, mu);
-
-    let Ep = (easting - 500000.0) / 0.9996;
-    let N = WGS84_a / (1.0 - e2 * foot_lat.sin() * foot_lat.sin()).sqrt();
-    let M = (WGS84_a * (1.0 - e2)) / (1.0 - e2 * foot_lat.sin() * foot_lat.sin()).powf(1.5);
-
-    let conv1 = -(Ep / N) * foot_lat.tan();
-    let H30 = (Ep / N).powi(3);
-    let K28 = N / M;
-    let K29 = K28 * K28;
-    let J29 = foot_lat.tan() * foot_lat.tan();
-    let conv2 = (foot_lat.tan() * H30 / 3.0) * (-2.0 * K29 + 3.0 * K28 + J29);
-    conv1 + conv2
-}
-
-#[allow(non_snake_case)]
-fn footprint_latitude(e1: f64, mu: f64) -> f64 {
-    let term1 = 3.0 * e1 / 2.0 - 27.0 * e1 * e1 * e1 / 32.0;
-    let term2 = 21.0 * e1 * e1 / 16.0 - 55.0 * e1 * e1 * e1 * e1 / 32.0;
-    let term3 = 151.0 * e1 * e1 * e1 / 96.0;
-    let term4 = 1097.0 * e1 * e1 * e1 * e1 / 512.0;
-
-    mu + term1 * (2.0 * mu).sin() + term2 * (4.0 * mu).sin() + term3 * (6.0 * mu).sin() +
-    term4 * (8.0 * mu).sin()
 }
 
 /// A IMU/GNSS point in UTM.

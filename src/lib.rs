@@ -5,6 +5,7 @@
 extern crate pabst;
 extern crate pof;
 extern crate rustc_serialize;
+extern crate utm;
 
 pub mod error;
 pub mod georef;
