@@ -78,7 +78,7 @@ fn main() {
                              exit!("ERROR: while opening source: {}", e);
                          });
     let ref pos = imu_gnss_from_path(args.arg_gnss_imu_file).unwrap_or_else(|e| {
-        exit!("ERROR: unable to read IMU/GNSS data: {:?}", e);
+        exit!("ERROR: unable to read IMU/GNSS data: {}", e);
     });
     let mut sink = pabst::open_file_sink(args.arg_outfile, config.remove("sink"))
                        .unwrap_or_else(|e| {
