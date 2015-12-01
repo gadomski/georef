@@ -96,8 +96,12 @@ fn main() {
     });
     let georeferencer = Georeferencer::new(georef_config);
 
-    georeferencer.georeference(&mut *source, pos, &mut *sink).unwrap();
-    sink.close_sink().unwrap();
+    georeferencer.georeference(&mut *source, pos, &mut *sink).unwrap_or_else(|e| {
+        exit!("ERROR: while georeferencing: {}", e);
+    });
+    sink.close_sink().unwrap_or_else(|e| {
+        exit!("ERROR: while closing sink: {}", e);
+    });
 }
 
 fn imu_gnss_from_path<P: AsRef<Path> + AsRef<OsStr>>(path: P) -> Result<ImuGnss> {
