@@ -14,6 +14,7 @@ doc = false
 [dependencies]
 docopt = "0.6"
 las = { git = "https://github.com/gadomski/las-rs.git" }
+nalgebra = "0.4"
 pabst = { git = "https://github.com/gadomski/pabst.git" }
 pof = { git = "https://github.com/gadomski/pof-rs.git" }
 rustc-serialize = "0.3"

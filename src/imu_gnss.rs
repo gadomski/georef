@@ -2,14 +2,15 @@
 
 use std::f64::consts::PI;
 
+use nalgebra::{Mat3, Vec3};
 use utm::radians_to_utm_wgs84;
 
 use Result;
 use error::Error;
-use linalg::{Matrix3, Vector3};
 
 /// A collection of ImuGnss records.
-#[derive(Debug)] pub struct ImuGnss {
+#[derive(Debug)]
+pub struct ImuGnss {
     points: Vec<ImuGnssPoint>,
 }
 
@@ -138,7 +139,9 @@ impl ImuGnssPoint {
     /// ```
     #[allow(non_snake_case)]
     pub fn into_utm(self, zone: UtmZone) -> ImuGnssUtmPoint {
-        let (northing, easting, meridian_convergence) = radians_to_utm_wgs84(self.latitude.0, self.longitude.0, zone.0);
+        let (northing, easting, meridian_convergence) = radians_to_utm_wgs84(self.latitude.0,
+                                                                             self.longitude.0,
+                                                                             zone.0);
         ImuGnssUtmPoint {
             time: self.time,
             northing: northing,
@@ -172,29 +175,27 @@ impl ImuGnssUtmPoint {
     /// # Examples
     ///
     /// TODO provide examples
-    pub fn rotation_matrix(&self) -> Matrix3 {
+    pub fn rotation_matrix(&self) -> Mat3<f64> {
         let sr = self.roll.0.sin();
         let cr = self.roll.0.cos();
         let sp = self.pitch.0.sin();
         let cp = self.pitch.0.cos();
         let sy = self.heading.0.sin();
         let cy = self.heading.0.cos();
-        let mut matrix = Matrix3::new();
-        matrix[(0, 0)] = cr * cy + sp * sr * sy;
-        matrix[(0, 1)] = cp * sy;
-        matrix[(0, 2)] = cy * sr - cr * sp * sy;
-        matrix[(1, 0)] = cy * sp * sr - cr * sy;
-        matrix[(1, 1)] = cp * cy;
-        matrix[(1, 2)] = -sr * sy - cr * cy * sp;
-        matrix[(2, 0)] = -cp * sr;
-        matrix[(2, 1)] = sp;
-        matrix[(2, 2)] = cp * cr;
-        matrix
+        Mat3::new(cr * cy + sp * sr * sy,
+                  cp * sy,
+                  cy * sr - cr * sp * sy,
+                  cy * sp * sr - cr * sy,
+                  cp * cy,
+                  -sr * sy - cr * cy * sp,
+                  -cp * sr,
+                  sp,
+                  cp * cr)
     }
 
     /// Returns this point's location as a `Vector3`.
-    pub fn location(&self) -> Vector3 {
-        Vector3(self.easting, self.northing, self.height as f64)
+    pub fn location(&self) -> Vec3<f64> {
+        Vec3::new(self.easting, self.northing, self.height as f64)
     }
 }
 
