@@ -1,6 +1,9 @@
 [source]
-sync-to-gps: true
+sync_to_pps = true
+
+[georef]
+utm_zone = 6
 
 [sink]
-auto-offset: true
-scale-factors: 0.01 0.01 0.01
+auto_offsets = true
+scale_factors = { x = 0.01, y = 0.01, z = 0.01 }
