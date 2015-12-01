@@ -4,6 +4,7 @@
 
 extern crate pabst;
 extern crate pof;
+extern crate rustc_serialize;
 
 pub mod error;
 pub mod georef;
@@ -12,7 +13,7 @@ pub mod linalg;
 pub mod pos;
 
 pub use error::Error;
-pub use georef::Georeferencer;
+pub use georef::{GeorefConfig, Georeferencer};
 pub use imu_gnss::{ImuGnss, ImuGnssPoint, Radians, UtmZone};
 
 use std::result;

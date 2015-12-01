@@ -9,6 +9,13 @@ use linalg::{Matrix3, Vector3};
 
 const DEFAULT_CHUNK_SIZE: usize = 1000;
 
+/// A decodable configuration object.
+#[derive(Clone, Copy, Debug, RustcDecodable)]
+pub struct GeorefConfig {
+    /// The UTM zone of the output points.
+    pub utm_zone: u8,
+}
+
 /// A configurable structure for georeferencing points.
 #[derive(Clone, Copy, Debug)]
 pub struct Georeferencer {
@@ -25,17 +32,17 @@ impl Georeferencer {
     /// # Examples
     ///
     /// ```
-    /// use georef::georef::Georeferencer;
-    /// use georef::imu_gnss::UtmZone;
-    /// let georeferencer = Georeferencer::new(UtmZone(6));
+    /// use georef::georef::{GeorefConfig, Georeferencer};
+    /// let config = GeorefConfig { utm_zone: 6 };
+    /// let georeferencer = Georeferencer::new(config);
     /// ```
-    pub fn new(utm_zone: UtmZone) -> Georeferencer {
+    pub fn new(config: GeorefConfig) -> Georeferencer {
         Georeferencer {
             boresight_matrix: Matrix3::identity(),
             chunk_size: DEFAULT_CHUNK_SIZE,
             lever_arm: Vector3(0.0, 0.0, 0.0),
             time_offset: 0.0,
-            utm_zone: utm_zone,
+            utm_zone: UtmZone(config.utm_zone),
         }
     }
 

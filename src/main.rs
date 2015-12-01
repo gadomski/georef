@@ -14,8 +14,10 @@ use std::io::Read;
 use std::path::Path;
 use std::process::exit;
 
+use rustc_serialize::Decodable;
+
 use docopt::Docopt;
-use georef::{Error, Result, Georeferencer, ImuGnss, ImuGnssPoint, Radians, UtmZone};
+use georef::{Error, Result, Georeferencer, GeorefConfig, ImuGnss, ImuGnssPoint, Radians};
 use georef::pos::read_pos_file;
 use pof::pof::Reader as PofReader;
 
@@ -85,21 +87,16 @@ fn main() {
                            exit!("ERROR: while opening sink: {}", e);
                        });
 
-    let georef_config = config.get("georef").and_then(|b| b.as_table());
-    let utm_zone = if let Some(zone) = args.flag_utm_zone {
-        UtmZone(zone)
-    } else if let Some(table) = georef_config {
-        UtmZone(table.get("utm-zone").unwrap().as_integer().unwrap() as u8)
-    } else {
-        println!("No UTM zone provided");
-        exit(1);
-    };
-    let georeferencer = Georeferencer::new(utm_zone);
+    let georef_config = config.remove("georef")
+                              .unwrap_or_else(|| {
+                                  exit!("ERROR: configuration file must have a 'georef' table");
+                              });
+    let georef_config = GeorefConfig::decode(&mut toml::Decoder::new(georef_config)).unwrap_or_else(|e| {
+        exit!("ERROR: unable to decode georef configuration: {}", e);
+    });
+    let georeferencer = Georeferencer::new(georef_config);
 
-    println!("Georeferencing");
     georeferencer.georeference(&mut *source, pos, &mut *sink).unwrap();
-    println!("Done");
-
     sink.close_sink().unwrap();
 }
 
