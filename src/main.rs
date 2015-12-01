@@ -24,30 +24,33 @@ Georeference point clouds.
 
 Usage:
     georef <infile> \
-                             <gnss-imu-file> <outfile> [--config-file=<config-file>] \
-                             [--utm-zone=<z>]
+                             <gnss-imu-file> <config-file> <outfile>
     georef (-h | --help)
-    georef --version
+    \
+                             georef --version
 
-\
-                             Options:
-    -h --help                       Display this message.
-    \
-                             --version                       Display  version.
-    \
-                             --config-file=<config-file>     Configuration file.
-    \
-                             --utm-zone=<n>                  UTM zone for final data, overrides \
-                             value in configuration file.
-";
+Options:
+    -h --help                       \
+                             Display this message.
+    --version                       Display  \
+                             version.
+    ";
 
 #[derive(Debug, RustcDecodable)]
 struct Args {
     flag_config_file: Option<String>,
     flag_utm_zone: Option<u8>,
+    arg_config_file: String,
     arg_infile: String,
     arg_gnss_imu_file: String,
     arg_outfile: String,
+}
+
+macro_rules! exit {
+    ($($tts:tt)*) => {{
+        println!($($tts)*);
+        exit(1);
+    }}
 }
 
 fn main() {
@@ -57,26 +60,30 @@ fn main() {
                          })
                          .unwrap_or_else(|e| e.exit());
 
-    let config = if let Some(config_file) = args.flag_config_file {
-        let mut config = String::new();
-        File::open(config_file).unwrap().read_to_string(&mut config).unwrap();
-        toml::Parser::new(&config).parse().unwrap()
-    } else {
-        toml::Table::new()
-    };
-
-    println!("Opening the point source");
-    let mut source = pabst::open_file_source(args.arg_infile,
-                                             config.get("source").and_then(|b| b.as_table()))
-                         .unwrap();
-
-    println!("Reading IMU/GNSS data");
-    let ref pos = imu_gnss_from_path(args.arg_gnss_imu_file).unwrap();
-
-    println!("Opening the point sink");
-    let mut sink = pabst::open_file_sink(args.arg_outfile,
-                                         config.get("sink").and_then(|b| b.as_table()))
-                       .unwrap();
+    let mut config = String::new();
+    File::open(args.arg_config_file)
+        .unwrap_or_else(|e| {
+            exit!("ERROR: problem reading config file: {}", e);
+        })
+        .read_to_string(&mut config)
+        .unwrap_or_else(|e| {
+            exit!("ERROR: problem reading file to string: {}", e);
+        });
+    let mut parser = toml::Parser::new(&config);
+    let mut config = parser.parse().unwrap_or_else(|| {
+        exit!("ERROR: unable to parse config file: {:?}", parser.errors);
+    });
+    let mut source = pabst::open_file_source(args.arg_infile, config.remove("source"))
+                         .unwrap_or_else(|e| {
+                             exit!("ERROR: while opening source: {}", e);
+                         });
+    let ref pos = imu_gnss_from_path(args.arg_gnss_imu_file).unwrap_or_else(|e| {
+        exit!("ERROR: unable to read IMU/GNSS data: {:?}", e);
+    });
+    let mut sink = pabst::open_file_sink(args.arg_outfile, config.remove("sink"))
+                       .unwrap_or_else(|e| {
+                           exit!("ERROR: while opening sink: {}", e);
+                       });
 
     let georef_config = config.get("georef").and_then(|b| b.as_table());
     let utm_zone = if let Some(zone) = args.flag_utm_zone {
