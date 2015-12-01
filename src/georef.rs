@@ -10,10 +10,12 @@ use imu_gnss::{ImuGnss, UtmZone};
 const DEFAULT_CHUNK_SIZE: usize = 1000;
 
 /// A decodable configuration object.
-#[derive(Clone, Copy, Debug, RustcDecodable)]
+#[derive(Clone, Copy, Debug, Default, RustcDecodable)]
 pub struct GeorefConfig {
     /// The UTM zone of the output points.
     pub utm_zone: u8,
+    /// Limit the number of points written out.
+    pub limit: Option<usize>,
 }
 
 /// A configurable structure for georeferencing points.
@@ -22,6 +24,7 @@ pub struct Georeferencer {
     boresight_matrix: Mat3<f64>,
     chunk_size: usize,
     lever_arm: Vec3<f64>,
+    limit: Option<usize>,
     time_offset: f64,
     utm_zone: UtmZone,
 }
@@ -33,7 +36,7 @@ impl Georeferencer {
     ///
     /// ```
     /// use georef::georef::{GeorefConfig, Georeferencer};
-    /// let config = GeorefConfig { utm_zone: 6 };
+    /// let config = GeorefConfig { utm_zone: 6, ..Default::default() };
     /// let georeferencer = Georeferencer::new(config);
     /// ```
     pub fn new(config: GeorefConfig) -> Georeferencer {
@@ -41,6 +44,7 @@ impl Georeferencer {
             boresight_matrix: Mat3::new_identity(3),
             chunk_size: DEFAULT_CHUNK_SIZE,
             lever_arm: Vec3::new(0.0, 0.0, 0.0),
+            limit: config.limit,
             time_offset: 0.0,
             utm_zone: UtmZone(config.utm_zone),
         }
@@ -53,6 +57,7 @@ impl Georeferencer {
                         sink: &mut pabst::Sink)
                         -> Result<()> {
         let mut hint = 0;
+        let mut npoints = 0;
         loop {
             let points = match try!(source.source(self.chunk_size)) {
                 Some(points) => points,
@@ -70,6 +75,12 @@ impl Georeferencer {
                 point.y = v.y;
                 point.z = v.z;
                 try!(sink.sink(&point));
+                npoints += 1;
+                if let Some(limit) = self.limit {
+                    if npoints >= limit {
+                        return Ok(());
+                    }
+                }
             }
         }
         Ok(())
