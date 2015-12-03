@@ -6,10 +6,11 @@ use std::io;
 use std::num::{ParseIntError, ParseFloatError};
 
 use pabst;
-use pof;
+use pos;
 
 /// Our custom error enum.
 #[derive(Debug)]
+#[allow(variant_size_differences)]
 pub enum Error {
     /// Wrapper around `std::io::Error`.
     Io(io::Error),
@@ -25,8 +26,12 @@ pub enum Error {
     ParseInt(ParseIntError),
     /// Wrapper around `std::num::ParseFloatError`.
     ParseFloat(ParseFloatError),
-    /// Wrapper around `pof::Error`.
-    Pof(pof::Error),
+    /// Unable to parse a rotation from a string.
+    ParseRotate(String),
+    /// Wrapper around `pos::Error`.
+    Pos(pos::Error),
+    /// An error when creating a SOCS map.
+    SocsMap(String),
 }
 
 impl error::Error for Error {
@@ -39,7 +44,9 @@ impl error::Error for Error {
             Error::Pabst(ref err) => err.description(),
             Error::ParseInt(ref err) => err.description(),
             Error::ParseFloat(ref err) => err.description(),
-            Error::Pof(_) => "pof error",
+            Error::ParseRotate(_) => "could not parse rotation",
+            Error::Pos(ref err) => err.description(),
+            Error::SocsMap(_) => "could not create SOCS map",
         }
     }
 
@@ -49,6 +56,7 @@ impl error::Error for Error {
             Error::Pabst(ref err) => Some(err),
             Error::ParseInt(ref err) => Some(err),
             Error::ParseFloat(ref err) => Some(err),
+            Error::Pos(ref err) => Some(err),
             _ => None,
         }
     }
@@ -64,7 +72,9 @@ impl fmt::Display for Error {
             Error::Pabst(ref err) => write!(f, "Pabst error: {}", err),
             Error::ParseInt(ref err) => write!(f, "Parse int error: {}", err),
             Error::ParseFloat(ref err) => write!(f, "Parse float error: {}", err),
-            Error::Pof(_) => write!(f, "Pof error"),
+            Error::ParseRotate(ref err) => write!(f, "Unable to parse string as rotation: {}", err),
+            Error::Pos(ref err) => write!(f, "Pos error: {}", err),
+            Error::SocsMap(ref s) => write!(f, "Could not create a SOCS map: {}", s),
         }
     }
 }
@@ -93,8 +103,8 @@ impl From<ParseFloatError> for Error {
     }
 }
 
-impl From<pof::Error> for Error {
-    fn from(err: pof::Error) -> Error {
-        Error::Pof(err)
+impl From<pos::Error> for Error {
+    fn from(err: pos::Error) -> Error {
+        Error::Pos(err)
     }
 }

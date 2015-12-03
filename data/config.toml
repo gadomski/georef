@@ -3,6 +3,10 @@ sync_to_pps = true
 
 [georef]
 utm_zone = 6
+socs_map = { x = "-z", y = "x", z = "y" }
+boresight = { roll = 0.0, pitch = 0.0, yaw = 0.0 }
+lever_arm = { x = 0.0, y = 0.0, z = 0.0 }
+rotation_order = ["r3(-yaw)", "r1(pitch)", "r2(roll)"]
 
 [sink]
 auto_offsets = true

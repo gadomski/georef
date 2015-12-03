@@ -4,18 +4,18 @@
 
 extern crate nalgebra;
 extern crate pabst;
-extern crate pof;
+extern crate pos;
 extern crate rustc_serialize;
+extern crate toml;
 extern crate utm;
 
+mod point;
+mod rotation;
 pub mod error;
 pub mod georef;
-pub mod imu_gnss;
-pub mod pos;
 
 pub use error::Error;
 pub use georef::{GeorefConfig, Georeferencer};
-pub use imu_gnss::{ImuGnss, ImuGnssPoint, Radians, UtmZone};
 
 use std::result;
 
